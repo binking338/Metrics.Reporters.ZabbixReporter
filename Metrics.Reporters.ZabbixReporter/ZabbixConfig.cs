@@ -11,7 +11,7 @@ namespace Metrics.Reporters
 {
     public class ZabbixConfig
     {
-        protected string _server = null, _user = null, _password = null;
+        protected string _url = null, _user = null, _password = null;
 
         protected Dictionary<string, Item> _ItemsCache = new Dictionary<string, Item>();
         protected Host _HostCache = null;
@@ -26,12 +26,11 @@ namespace Metrics.Reporters
             ZabbixApi.Helper.Check.NotNull(server, "server");
 
             string hostname = System.Net.Dns.GetHostName();
-            _server = server;
-            _user = user;
-            _password = password;
-            _contextCreator = string.IsNullOrWhiteSpace(user) ?
-               (Func<ZabbixApi.Context>)(() => { return new ZabbixApi.Context(); }) :
-                (Func<ZabbixApi.Context>)(() => { return new ZabbixApi.Context(string.Format("http://{0}/zabbix/api_jsonrpc.php", server), user, password); });
+            _url = System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.url"] ?? string.Format("http://{0}/zabbix/api_jsonrpc.php", server);
+            _user = user ?? System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.user"];
+            _password = password ?? System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.password"];
+
+            _contextCreator = (Func<ZabbixApi.Context>)(() => { return new ZabbixApi.Context(_url, user, password); });
             using (var context = _contextCreator())
             {
                 var service = new ZabbixApi.Services.HostService(context);
@@ -80,7 +79,7 @@ namespace Metrics.Reporters
                 }
                 catch (Exception ex)
                 {
-                    MetricsErrorHandler.Handle(ex, string.Format("Error on configuring zabbix trapper item, zabbix server {0}", _server));
+                    MetricsErrorHandler.Handle(ex, string.Format("Error on configuring zabbix trapper item, zabbix api {0}", _url));
                     return false;
                 }
             }
@@ -126,7 +125,7 @@ namespace Metrics.Reporters
                 }
                 catch (Exception ex)
                 {
-                    MetricsErrorHandler.Handle(ex, string.Format("Error on configuring zabbix template, zabbix server {0}", _server));
+                    MetricsErrorHandler.Handle(ex, string.Format("Error on configuring zabbix template, zabbix api {0}", _url));
                     return false;
                 }
             }
@@ -159,7 +158,7 @@ namespace Metrics.Reporters
                 }
                 catch (Exception ex)
                 {
-                    MetricsErrorHandler.Handle(ex, string.Format("Error on configuring zabbix host group, zabbix server {0}", _server));
+                    MetricsErrorHandler.Handle(ex, string.Format("Error on configuring zabbix host group, zabbix api {0}", _url));
                     return false;
                 }
             }
@@ -193,7 +192,7 @@ namespace Metrics.Reporters
                 }
                 catch (Exception ex)
                 {
-                    MetricsErrorHandler.Handle(ex, string.Format("Error on configuring zabbix application, zabbix server {0}", _server));
+                    MetricsErrorHandler.Handle(ex, string.Format("Error on configuring zabbix application, zabbix api {0}", _url));
                     return false;
                 }
             };
