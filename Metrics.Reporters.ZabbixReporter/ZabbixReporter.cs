@@ -10,17 +10,16 @@ namespace Metrics.Reporters
 {
     public class ZabbixReporter : BaseReport
     {
-        protected string currentContextName = null;
-        protected Queue<ItemValue> sendQueue = new Queue<ItemValue>();
+        protected Queue<ItemValue> _sendQueue = new Queue<ItemValue>();
 
-        protected string hostname { get; set; }
+        protected string Hostname { get; set; }
         protected ZabbixSender ZabbixSender { get; set; }
         protected ZabbixConfig ZabbixConfig { get; set; }
 
         public ZabbixReporter(string zabbixServer, int port = 10051, string user = null, string password = null, string template = null)
         {
             template = template ?? GetGlobalContextName();
-            hostname = System.Net.Dns.GetHostName();
+            Hostname = ZabbixConfig.GetLocalHostname();
             ZabbixSender = new ZabbixSender(zabbixServer, port);
             try
             {
@@ -35,27 +34,15 @@ namespace Metrics.Reporters
 
         protected override void StartReport(string contextName)
         {
-            sendQueue.Clear();
+            _sendQueue.Clear();
             base.StartReport(contextName);
         }
 
         protected override void EndReport(string contextName)
         {
             base.EndReport(contextName);
-            ZabbixSender.Send(sendQueue);
-            sendQueue.Clear();
-        }
-
-        protected override void StartContext(string contextName)
-        {
-            currentContextName = contextName;
-            base.StartContext(contextName);
-        }
-
-        protected override void EndContext(string contextName)
-        {
-            base.EndContext(contextName);
-            currentContextName = null;
+            ZabbixSender.Send(_sendQueue);
+            _sendQueue.Clear();
         }
 
         protected override void ReportGauge(string name, double value, Unit unit, MetricTags tags)
@@ -65,7 +52,7 @@ namespace Metrics.Reporters
             {
                 if (null != ZabbixConfig) ZabbixConfig.TryCreateTrapperItem(name, unit.ToString(), ZabbixApi.Entities.Item.ValueType.NumericFloat);
                 item = NewItemValue(name, value);
-                sendQueue.Enqueue(item);
+                _sendQueue.Enqueue(item);
             }
         }
 
@@ -74,7 +61,7 @@ namespace Metrics.Reporters
             ItemValue item = null;
             if (null != ZabbixConfig) ZabbixConfig.TryCreateTrapperItem(name, unit.ToString(), ZabbixApi.Entities.Item.ValueType.NumericUnsigned);
             item = NewItemValue(name, value.Count);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             if (value.Items != null && value.Items.Length != 0)
             {
                 foreach (var itm in value.Items)
@@ -85,9 +72,9 @@ namespace Metrics.Reporters
                         ZabbixConfig.TryCreateTrapperItem(SubfolderNameAsPercent(name, itm.Item), Unit.Percent.ToString(), ZabbixApi.Entities.Item.ValueType.NumericFloat);
                     }
                     item = NewItemValue(SubfolderName(name, itm.Item), itm.Count);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                     item = NewItemValue(SubfolderNameAsPercent(name, itm.Item), itm.Percent);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                 }
             }
         }
@@ -119,32 +106,32 @@ namespace Metrics.Reporters
             if (withMainCount)
             {
                 item = NewItemValue(SubfolderName(name, "Count"), value.Count);
-                sendQueue.Enqueue(item);
+                _sendQueue.Enqueue(item);
             }
             item = NewItemValue(SubfolderName(name, "Last"), value.LastValue);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "Min"), value.Min);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "Mean"), value.Mean);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "Median"), value.Median);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "Max"), value.Max);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "p75"), value.Percentile75);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "p95"), value.Percentile95);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "p98"), value.Percentile98);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "p99"), value.Percentile99);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "p999"), value.Percentile999);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "StdDev"), value.StdDev);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "Sample"), value.SampleSize);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
         }
 
         protected override void ReportMeter(string name, MetricData.MeterValue value, Unit unit, TimeUnit rateUnit, MetricTags tags)
@@ -165,16 +152,16 @@ namespace Metrics.Reporters
             if (withMainCount)
             {
                 item = NewItemValue(SubfolderName(name, "Count"), value.Count);
-                sendQueue.Enqueue(item);
+                _sendQueue.Enqueue(item);
             }
             item = NewItemValue(SubfolderName(name, "Rate-Mean"), value.MeanRate);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "Rate-1-min"), value.OneMinuteRate);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "Rate-5-min"), value.FiveMinuteRate);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             item = NewItemValue(SubfolderName(name, "Rate-15-min"), value.FifteenMinuteRate);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             if (value.Items != null && value.Items.Length != 0)
             {
                 foreach (var itm in value.Items)
@@ -189,17 +176,17 @@ namespace Metrics.Reporters
                         ZabbixConfig.TryCreateTrapperItem(SubfolderName(name, SubfolderName(itm.Item, "Rate-15-min")), rateUnit.Unit().ToString(), ZabbixApi.Entities.Item.ValueType.NumericFloat);
                     }
                     item = NewItemValue(SubfolderName(name, SubfolderName(itm.Item, "Count")), itm.Value.Count);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                     item = NewItemValue(SubfolderNameAsPercent(name, itm.Item), itm.Percent);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                     item = NewItemValue(SubfolderName(name, SubfolderName(itm.Item, "Rate-Mean")), itm.Value.MeanRate);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                     item = NewItemValue(SubfolderName(name, SubfolderName(itm.Item, "Rate-1-min")), itm.Value.OneMinuteRate);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                     item = NewItemValue(SubfolderName(name, SubfolderName(itm.Item, "Rate-5-min")), itm.Value.FiveMinuteRate);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                     item = NewItemValue(SubfolderName(name, SubfolderName(itm.Item, "Rate-15-min")), itm.Value.FifteenMinuteRate);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                 }
             }
         }
@@ -212,7 +199,7 @@ namespace Metrics.Reporters
                 ZabbixConfig.TryCreateTrapperItem(SubfolderName(name, "ActiveSessions"), Unit.None.ToString(), ZabbixApi.Entities.Item.ValueType.NumericUnsigned);
             }
             item = NewItemValue(SubfolderName(name, "ActiveSessions"), value.ActiveSessions);
-            sendQueue.Enqueue(item);
+            _sendQueue.Enqueue(item);
             ReportMeter(name, value.Rate, unit, rateUnit, tags);
             ReportHistogram(SubfolderName(name, "Duration"), value.Histogram, Unit.Custom(durationUnit.Unit()), tags, false);
         }
@@ -229,19 +216,19 @@ namespace Metrics.Reporters
                 }
 
                 item = NewItemValue(SubfolderName(typeof(HealthStatus).Name, itm.Name), itm.Check.IsHealthy);
-                sendQueue.Enqueue(item);
+                _sendQueue.Enqueue(item);
                 if (!itm.Check.IsHealthy)
                 {
                     // 仅在健康检查不通过的时候上报具体信息
                     item = NewItemValue(SubfolderName(typeof(HealthStatus).Name, SubfolderName(itm.Name, "Message")), itm.Check.Message);
-                    sendQueue.Enqueue(item);
+                    _sendQueue.Enqueue(item);
                 }
             }
         }
 
         protected virtual ItemValue NewItemValue(string key, object value)
         {
-            return new ItemValue() { Key = key, Value = value, Host = hostname };
+            return new ItemValue() { Key = key, Value = value, Host = Hostname };
         }
 
         protected virtual string SubfolderName(string name, string subname)

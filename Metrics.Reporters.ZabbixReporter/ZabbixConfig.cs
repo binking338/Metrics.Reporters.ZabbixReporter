@@ -25,8 +25,9 @@ namespace Metrics.Reporters
         {
             ZabbixApi.Helper.Check.NotNull(server, "server");
 
-            string hostname = System.Net.Dns.GetHostName();
-            _url = System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.url"] ?? string.Format("http://{0}/zabbix/api_jsonrpc.php", server);
+            string hostname = GetLocalHostname();
+            _url = System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.url"];
+            if (string.IsNullOrWhiteSpace(_url)) _url = string.Format("http://{0}/zabbix/api_jsonrpc.php", server);
             _user = user ?? System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.user"];
             _password = password ?? System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.password"];
 
@@ -196,6 +197,16 @@ namespace Metrics.Reporters
                     return false;
                 }
             };
+        }
+
+        /// <summary>
+        /// System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.localhost"] or System.Net.Dns.GetHostName()
+        /// </summary>
+        /// <returns></returns>
+        public static string GetLocalHostname()
+        {
+            var localhost = System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.localhost"];
+            return string.IsNullOrWhiteSpace(localhost) ? System.Net.Dns.GetHostName() : localhost;
         }
     }
 }
