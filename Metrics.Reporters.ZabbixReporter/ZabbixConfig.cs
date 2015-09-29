@@ -25,22 +25,15 @@ namespace Metrics.Reporters
         {
             ZabbixApi.Helper.Check.NotNull(server, "server");
 
-            string hostname = GetLocalHostname();
             _url = System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.url"];
             if (string.IsNullOrWhiteSpace(_url)) _url = string.Format("http://{0}/zabbix/api_jsonrpc.php", server);
             _user = user ?? System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.user"];
             _password = password ?? System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.password"];
 
             _contextCreator = (Func<ZabbixApi.Context>)(() => { return new ZabbixApi.Context(_url, _user, _password); });
-            using (var context = _contextCreator())
+            if (!TryCreateHost(GetLocalHostname()))
             {
-                var service = new ZabbixApi.Services.HostService(context);
-                var host = service.GetByName(hostname);
-                if (host == null)
-                {
-                    throw new Exception(string.Format("Zabbix server have not configured host named \"{0}\""));
-                }
-                _HostCache = host;
+                throw new Exception(string.Format("Zabbix server have not configured host named \"{0}\""));
             }
         }
 
@@ -199,6 +192,60 @@ namespace Metrics.Reporters
             };
         }
 
+        public bool TryCreateHost(string name)
+        {
+            ZabbixApi.Helper.Check.IsNotNullOrWhiteSpace(name, "name");
+            if (!TryCreateHostGroup("Metrics.NET")) return false;
+
+            using (var context = _contextCreator())
+            {
+                try
+                {
+                    var service = new ZabbixApi.Services.HostService(context);
+                    var host = service.GetByName(name);
+                    if (host == null)
+                    {
+                        if (IsIpAddress(name))
+                        {
+                            host = new Host();
+                            host.host = name;
+                            host.interfaces = host.interfaces ?? new List<HostInterface>();
+                            host.interfaces.Add(new HostInterface()
+                            {
+                                type = HostInterface.InterfaceType.Agent,
+                                main = true,
+                                useip = true,
+                                ip = name,
+                                dns = "",
+                                port = "10050"
+                            });
+                            host.groups = host.groups ?? new List<HostGroup>();
+                            host.groups.Add(_HostGroupMetricsCache);
+                            host.Id = service.Create(host);
+                        }
+                        else
+                        {
+                            return false;
+                        }
+                    }
+                    if (host.Id != null)
+                    {
+                        _HostCache = host;
+                        return true;
+                    }
+                    else
+                    {
+                        return false;
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MetricsErrorHandler.Handle(ex, string.Format("Error on create zabbix host, zabbix api {0}", _url));
+                    return false;
+                }
+            }
+        }
+
         /// <summary>
         /// System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.localhost"] or System.Net.Dns.GetHostName()
         /// </summary>
@@ -207,6 +254,13 @@ namespace Metrics.Reporters
         {
             var localhost = System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.localhost"];
             return string.IsNullOrWhiteSpace(localhost) ? System.Net.Dns.GetHostName() : localhost;
+        }
+
+        private static bool IsIpAddress(string ip)
+        {
+            System.Net.IPAddress add;
+            return System.Net.IPAddress.TryParse(ip, out add);
+
         }
     }
 }
