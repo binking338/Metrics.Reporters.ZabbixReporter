@@ -31,7 +31,7 @@ namespace Metrics.Reporters
             _user = user ?? System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.user"];
             _password = password ?? System.Configuration.ConfigurationManager.AppSettings["ZabbixApi.password"];
 
-            _contextCreator = (Func<ZabbixApi.Context>)(() => { return new ZabbixApi.Context(_url, user, password); });
+            _contextCreator = (Func<ZabbixApi.Context>)(() => { return new ZabbixApi.Context(_url, _user, _password); });
             using (var context = _contextCreator())
             {
                 var service = new ZabbixApi.Services.HostService(context);
